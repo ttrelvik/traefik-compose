@@ -1,0 +1,4 @@
+tls:
+  certificates:
+    - certFile: /etc/ssl/certs/selfsigned.crt
+      keyFile: /etc/ssl/private/selfsigned.key

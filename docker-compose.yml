@@ -1,0 +1,50 @@
+# traefik + Jenkins containers
+services:
+  traefik:
+    image: "traefik:v3.0"
+    container_name: "traefik"
+    command:
+      # Tells Traefik to listen for configuration changes from Docker itself.
+      - "--providers.docker=true"
+      # Defines an entry point named "websecure" that listens on port 443 for HTTPS traffic.
+      - "--entrypoints.websecure.address=:443"
+      # Tells Traefik to look for additional dynamic configuration files in this directory.
+      - "--providers.file.directory=/configuration/"
+      # Enables automatically reloading the dynamic configuration when files change.
+      - "--providers.file.watch=true"
+      # Enable the traefik dashboard
+      - "--api.dashboard=true"
+    ports:
+      - "443:443"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./dynamic_conf.yml:/configuration/dynamic_conf.yml"
+      - "./certs:/etc/ssl" # Mount the entire certs directory
+    labels:
+      - "traefik.enable=true"
+      # Creates a router named "dashboard" that matches requests for "traefik.local".
+      - "traefik.http.routers.dashboard.rule=Host(`traefik.local`)"
+      # Assigns this router to the "websecure" (HTTPS) entry point.
+      - "traefik.http.routers.dashboard.entrypoints=websecure"
+      # Enables TLS for this router.
+      - "traefik.http.routers.dashboard.tls=true"
+      # Tells the router to forward traffic to Traefik's special internal API service.
+      - "traefik.http.routers.dashboard.service=api@internal"
+
+  jenkins:
+    image: jenkins/jenkins:lts
+    container_name: jenkins
+    volumes:
+      # Mounts the named volume "jenkins_home" to persist Jenkins data.
+      - jenkins_home:/var/jenkins_home
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.jenkins.rule=Host(`jenkins.local`)"
+      - "traefik.http.routers.jenkins.entrypoints=websecure"
+      - "traefik.http.routers.jenkins.tls=true"
+      - "traefik.http.services.jenkins.loadbalancer.server.port=8080"
+
+volumes:
+  jenkins_home:
+    # this volume was created outside of Docker Compose's control.
+    external: true
